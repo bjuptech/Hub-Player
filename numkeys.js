@@ -1,3 +1,4 @@
+videojs.registerPlugin('numkeys', function() {
 var theVideo = document.getElementById("cspd_video");
   document.onkeydown = function(event) {
       switch (event.keyCode) {
@@ -16,4 +17,5 @@ var theVideo = document.getElementById("cspd_video");
             break;
          
       }
+  };
   };
