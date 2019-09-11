@@ -1,5 +1,14 @@
-var theVideo = document.getElementById("cspd_video");
-  document.onkeydown = function(event) {
+videojs.registerPlugin('customEvent', function() {
+    var myPlayer = this,
+        videoName,
+        rewindAmount = 5,
+        controlBar,
+        newElement = document.createElement('div'),
+        newImage = document.createElement('img');
+
+        
+
+    document.onkeydown = function(event) {
       switch (event.keyCode) {
          case 37:
               event.preventDefault();
@@ -14,6 +23,5 @@ var theVideo = document.getElementById("cspd_video");
               vid_currentTime = theVideo.currentTime;
               theVideo.currentTime = vid_currentTime + 5;
             break;
-         
-      }
-  };
+    });
+});
