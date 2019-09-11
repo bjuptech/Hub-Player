@@ -1,4 +1,4 @@
-videojs.registerPlugin('backForwardButtons', function() {
+videojs.registerPlugin('arrowKeys', function() {
   var myPlayer = this,
       jumpAmount = 5;
 
