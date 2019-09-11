@@ -29,7 +29,7 @@ videojs.registerPlugin('backForwardButtons', function() {
 
   // +++ Add event handlers to jump back or forward +++
   // Back button logic, don't jump to negative times
-  newElementBB.addEventListener('onkeydown', function (event) {
+  document.addEventListener('onkeydown', function (event) {
 	  switch (event.keyCode) {
 		  case 37:
 			event.preventDefault();
@@ -46,7 +46,7 @@ videojs.registerPlugin('backForwardButtons', function() {
   });
 
   // Forward button logic, don't jump past the duration
-  newElementFB.addEventListener('onkeydown', function (event) {
+  document.addEventListener('onkeydown', function (event) {
 	  switch (event.keyCode) {
 		  case 39:
 			event.preventDefault();
