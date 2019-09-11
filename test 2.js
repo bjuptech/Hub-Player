@@ -29,7 +29,10 @@ videojs.registerPlugin('backForwardButtons', function() {
 
   // +++ Add event handlers to jump back or forward +++
   // Back button logic, don't jump to negative times
-  newElementBB.addEventListener('click', function () {
+  newElementBB.addEventListener('onkeydown', function () {
+	  switch (event.keyCode) {
+		  case 37:
+			event.preventDefault ();
     var newTime,
         rewindAmt = jumpAmount,
         videoTime = myPlayer.currentTime();
@@ -39,10 +42,14 @@ videojs.registerPlugin('backForwardButtons', function() {
       newTime = 0;
     }
     myPlayer.currentTime(newTime);
+	  };
   });
 
   // Forward button logic, don't jump past the duration
-  newElementFB.addEventListener('click', function () {
+  newElementFB.addEventListener('onkeydown', function () {
+	  switch (event.keyCode) {
+		  case 39:
+			event.preventDefault();
     var newTime,
         forwardAmt = jumpAmount,
         videoTime = myPlayer.currentTime(),
@@ -53,5 +60,6 @@ videojs.registerPlugin('backForwardButtons', function() {
       newTime = videoDuration;
     }
     myPlayer.currentTime(newTime);
+	  };
   });
 });
