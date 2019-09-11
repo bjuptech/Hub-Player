@@ -4,7 +4,7 @@ videojs.registerPlugin('arrowKeys', function() {
 
   // +++ Add event handlers to jump back or forward +++
   // Back button logic, don't jump to negative times
-  document.onkeydown = function(event) {
+  myPlayer.addEventListener('document.onkeydown', function (event) {
 	  switch (event.keyCode) {
          case 37:
               event.preventDefault();
