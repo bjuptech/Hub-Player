@@ -32,6 +32,7 @@ videojs.registerPlugin('backForwardButtons', function() {
   newElementBB.addEventListener('onkeydown', function (event) {
 	  switch (event.keyCode) {
 		  case 37:
+			event.preventDefault();
     var newTime,
         rewindAmt = jumpAmount,
         videoTime = myPlayer.currentTime();
@@ -48,6 +49,7 @@ videojs.registerPlugin('backForwardButtons', function() {
   newElementFB.addEventListener('onkeydown', function (event) {
 	  switch (event.keyCode) {
 		  case 39:
+			event.preventDefault();
     var newTime,
         forwardAmt = jumpAmount,
         videoTime = myPlayer.currentTime(),
