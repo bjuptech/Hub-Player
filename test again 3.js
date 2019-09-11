@@ -4,7 +4,10 @@ videojs.registerPlugin('arrowKeys', function() {
 
   // +++ Add event handlers to jump back or forward +++
   // Back button logic, don't jump to negative times
-  myPlayer.addEventListener('case' 37, function () {
+  myPlayer.addEventListener('switch', function (event) {
+	  switch (event.keyCode) {
+         case 37:
+              event.preventDefault();
     var newTime,
         rewindAmt = jumpAmount,
         videoTime = myPlayer.currentTime();
@@ -14,6 +17,7 @@ videojs.registerPlugin('arrowKeys', function() {
       newTime = 0;
     }
     myPlayer.currentTime(newTime);
+	  };
   });
 
   // Forward button logic, don't jump past the duration
