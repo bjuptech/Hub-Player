@@ -1,0 +1,624 @@
+'SAVE CREDITS TO SHAREPOINT
+'ASSUMPTIONS:
+  'Assumes Slate slide contains segment code if segment; otherwise, treats as lesson
+  'Assumes placeholder segment slide contains segment code (if not will not write placeholder record to SP)
+
+Sub SaveCreditsToDatabase()
+  Dim fileEnv As String
+  Dim oSld As Slide
+  Dim sFileName As String
+  Dim sDivider As String
+  Dim sSlideNote As String
+  Dim iReturnPos As Integer
+  Dim sLine As String
+  Dim courseName As String
+  Dim couseDay As String
+  Dim dashAt As Integer
+  Dim dotAt As Integer
+  Dim curUser As String
+  Dim creditsFile As String
+  Dim file_loc As String
+  With ActivePresentation
+    file_loc = .FullName
+  End With
+
+  
+  fileEnv = GetFileEnvironment()
+  'FOR NON-PROD ENVS
+  If (fileEnv <> "prod") Then
+    MsgBox "File Environment is " & fileEnv
+  End If
+  
+  Dim idConn As ADODB.Connection
+  Set idConn = New ADODB.Connection
+  With idConn
+        .ConnectionString = GetIdConnString(fileEnv)
+        .Open
+  End With
+  
+  Dim creditConn As ADODB.Connection
+  Set creditConn = New ADODB.Connection
+  With creditConn
+          .ConnectionString = GetCreditConnString(fileEnv)
+          .Open
+  End With
+  
+  Dim cmConn As ADODB.Connection
+  Set cmConn = New ADODB.Connection
+  With cmConn
+        .ConnectionString = GetCMConnString(fileEnv)
+        .Open
+  End With
+  
+  Dim newval As Integer 'used to hold the id of this course from the Course Master table
+  
+  Dim segmentSeries As String 'same as SEGMENT NAME below
+  Dim segmentName As String
+  Dim sldSrc As String
+  segmentName = ReadSegmentNameFromSlateSlide()
+'MsgBox "found " & segmentName
+  If (segmentName = "") Then
+    sldSrc = "Lesson"
+    courseName = GetCourseFromFileName(sldSrc)
+    courseDay = GetCourseDayFromFileName(sldSrc)
+    segmentSeries = ""
+  Else
+    sldSrc = "Segment"
+    courseName = GetCourseFromFileName(sldSrc)
+    courseDay = ""
+    segmentSeries = segmentName
+  End If
+  
+  Dim i As Integer
+
+    
+  Dim strt As Integer
+  Dim innerStrt As Integer
+  Dim piece As String
+  Dim lne As Variant
+  Dim cid As String
+  Dim cname As String
+  Dim credit As String
+  Dim ctype As String
+  Dim c4 As String
+  Dim sparts() As String
+  Dim cuse
+  
+  newval = GetCourseId(cmConn, courseName)
+ 
+    
+  For Each oSld In ActivePresentation.Slides
+    found = False
+    isnew = False
+    
+    ' For the yellow, segment placeholder slides in lessons
+    If oSld.CustomLayout.Name = "Insert Segment" Then
+      
+        'MEDIA_NAME = blank
+        'credit = blank
+        'CREDIT_name = segment code
+        'MEDIA_TYPE = Segment
+        '[Segment Series] = blank
+        'Course Name same
+        'Slide num same
+        ctype = "Segment"
+      Dim holderSegmentName As String
+      holderSegmentName = GetSegmentCodeFromHolderSlide(oSld)
+ 'MsgBox "found holderSegmentName " & holderSegmentName
+      'IF SLIDE SLATE HAS NO SEGMENT CODE, THEN ALERT USER AND DON'T MESS WITH SLIDE
+        If holderSegmentName = "" Then
+'CHECK SLIDE TO SEE IF REFERENCE NEEDS TO BE REMOVED
+            
+          sSlideNote = oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text
+          If (InStr(1, sSlideNote, "^") > 0) Then
+            MsgBox ("WARNING: Insert Segment Slide # " & oSld.slideIndex & " has no Segment Code but possibly contains a Credit SN in Notes. Please remove and re-run SaveCreditsToDatabase Module. Or add Segment Code back to Segment Holder slide.")
+          Else
+            MsgBox ("WARNING: Insert Segment Slide # " & oSld.slideIndex & " has no Segment Code so segment acknowlegments will not be recorded.")
+          End If
+            
+
+        Else
+         
+          
+          'CHECK SLIDE NOTE FOR ACK ID
+          sSlideNote = oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text
+          strt = 0
+          Dim newslidenote As String
+          sparts = Split(sSlideNote, Chr(13))
+          Dim icount As Integer
+          icount = 0
+          Dim restOfNotes As String
+          restOfNotes = ""
+          cid = -1
+          cname = ""
+          ctype = "Segment"
+          credit = ""
+          c4 = ""
+          cuse = "Yes"
+          innerStrt = 0
+          Dim origFirstLine As String
+          For Each lne In sparts
+            icount = icount + 1
+            If (icount = 1) Then 'ONLY if first line, check for id
+              If (Len(lne) - Len(Replace(lne, "^", "")) >= 1) Then 'has an id
+                piece = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+                If (innerStrt = 0 And IsNumeric(piece)) Then 'Should always be case
+                  origFirstLine = lne
+                  cid = piece
+                  innerStrt = InStr(innerStrt + 1, lne, "^")
+                  cname = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+                  'ignore rest of line
+'    MsgBox "found cid " & cid
+'    MsgBox "found cname " & cname
+                  If (holderSegmentName = "") Then
+                    MsgBox "WARNING: Slide # " & oSld.slideIndex & " has no Segment Code, but contains an Credit SN in Notes. To remove this credit reference, delete line from Notes and run SaveCreditsToDatabase Macro again."
+                  End If
+                End If
+              End If
+            End If
+          Next
+              
+              
+              
+          'check to see if matches, update if not
+          If holderSegmentName = cname Then
+            'use what we got
+          Else
+            cname = holderSegmentName
+          End If
+              
+          If (cid > 0) Then 'SHOULD BE IN SP
+            
+            'CHECK DATABASE FOR THIS ID
+    'MsgBox ("Record has ID; Checking to see if exists in SP " & cid & "|" & cname)
+            found = CheckValuesInRow(creditConn, cid, newval, ctype, c4, courseDay, oSld.slideIndex, cname, credit, cuse, sldSrc, segmentSeries)
+            'IF FOUND, SET
+            If (found = True) Then
+              segmentCredit = cid + "^" + holderSegmentName + "^Segment"
+'              newslidenote = segmentCredit & Chr(13) & restOfNotes
+If (origFirstLine <> "") Then
+  newslidenote = Replace(sSlideNote, origFirstLine, segmentCredit)
+Else
+  newslidenote = segmentCredit & Chr(13) & sSlideNote
+End If
+            
+            End If ' end same/change
+          ElseIf (cid <= 0 And cname <> "") Then 'does not exist in SP yet -- get counter
+    'MsgBox "No Id; adding new record to SP"
+            isnew = True
+            cid = GetMyNewId(idConn)
+            segmentCredit = cid + "^" + holderSegmentName + "^Segment"
+'            newslidenote = segmentCredit & Chr(13) & restOfNotes
+If (origFirstLine <> "") Then
+  newslidenote = Replace(sSlideNote, origFirstLine, segmentCredit)
+Else
+  newslidenote = segmentCredit & Chr(13) & sSlideNote
+End If
+            Call AddValuesToRow(creditConn, cid, newval, ctype, c4, courseDay, oSld.slideIndex, cname, credit, "C", cuse, sldSrc, segmentSeries)
+          End If ' end if/else found or added
+        
+          If (cid > -1 And found = False And isnew = False) Then 'add it in; was not found
+    'MsgBox "Has id; should be in SP, but is NOT; adding CRUD = R item " & cid
+            segmentCredit = cid + "^" + holderSegmentName + "^Segment"
+'            newslidenote = segmentCredit & Chr(13) & restOfNotes
+If (origFirstLine <> "") Then
+  newslidenote = Replace(sSlideNote, origFirstLine, segmentCredit)
+Else
+  newslidenote = segmentCredit & Chr(13) & sSlideNote
+End If
+
+            Call AddValuesToRow(creditConn, cid, newval, ctype, c4, courseDay, oSld.slideIndex, cname, credit, "R", cuse, sldSrc, segmentSeries)
+          End If
+                        
+          oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text = newslidenote 'write back notes
+        End If
+      
+      ElseIf oSld.slideIndex > 1 And oSld.CustomLayout.Name <> "Acknowledgments 1" And _
+       oSld.CustomLayout.Name <> "Acknowledgments 2" And oSld.CustomLayout.Name <> "Copyright" And oSld.CustomLayout.Name <> "Credits NOT Final." And _
+       Len(oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text) > 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "The first slide") <= 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "This is a placeholder slide") <= 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "Slide Transition") <= 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "Keep this slide") <= 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "This is the last slide") <= 0 Then
+    ' Get the slide note text
+    sSlideNote = oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text
+    strt = 0
+    cuse = "Yes"
+    If (Len(sSlideNote) > 0) Then
+    newslidenote = ""
+    
+    sparts = Split(sSlideNote, Chr(13))
+    For Each lne In sparts
+     cid = -1
+     cname = piece
+     ctype = ""
+     credit = ""
+     c4 = ""
+     innerStrt = 0
+     If (Len(lne) - Len(Replace(lne, "^", "")) > 1) Then 'has more than 1 ^, must be non-BJU type
+'MsgBox "line is " & lne
+          piece = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+          If (innerStrt = 0 And IsNumeric(piece)) Then
+            cid = piece
+            innerStrt = InStr(innerStrt + 1, lne, "^")
+            cname = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+            innerStrt = InStr(innerStrt + 1, lne, "^")
+            If (InStr(innerStrt + 1, lne, "^") > 0) Then ' must have credit
+              credit = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+              innerStrt = InStr(innerStrt + 1, lne, "^")
+              If (InStr(innerStrt + 1, lne, "^") > 0) Then ' must have ctype
+                ctype = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+                innerStrt = InStr(innerStrt + 1, lne, "^")
+                If (InStr(innerStrt + 1, lne, "^") > 0) Then ' must have c4
+                  c4 = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+                Else
+                  c4 = Mid(lne, innerStrt + 1)
+                End If
+              Else
+                ctype = Mid(lne, innerStrt + 1)
+              End If
+            Else
+              credit = Mid(lne, innerStrt + 1)
+            End If
+          Else
+            cid = -1
+            cname = piece
+            innerStrt = InStr(innerStrt + 1, lne, "^")
+            If (InStr(innerStrt + 1, lne, "^") > 0) Then ' must have credit
+              credit = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+              innerStrt = InStr(innerStrt + 1, lne, "^")
+              If (InStr(innerStrt + 1, lne, "^") > 0) Then ' must have ctype
+                ctype = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+                innerStrt = InStr(innerStrt + 1, lne, "^")
+                If (InStr(innerStrt + 1, lne, "^") > 0) Then ' must have c4
+                  c4 = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+                Else
+                  c4 = Mid(lne, innerStrt + 1)
+                End If
+              Else
+                ctype = Mid(lne, innerStrt + 1)
+              End If
+            Else
+              credit = Mid(lne, innerStrt + 1)
+            End If
+          End If
+          
+          innerStrt = InStr(innerStrt + 1, lne, "^")
+        Else
+          If InStr(innerStrt + 1, lne, "^") > 0 Then
+            piece = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+          Else
+            piece = lne
+          End If
+          If (innerStrt = 0 And IsNumeric(piece)) Then
+            cid = piece
+            innerStrt = InStr(innerStrt + 1, lne, "^")
+            If (InStr(innerStrt + 1, lne, "^") > 0) Then ' must have c4
+              cname = Mid(lne, innerStrt + 1, InStr(innerStrt + 1, lne, "^") - (innerStrt + 1))
+            Else
+              cname = Mid(lne, innerStrt + 1)
+            End If
+            ctype = ""
+            credit = ""
+            c4 = ""
+          Else
+            cid = -1
+            cname = piece
+            ctype = ""
+            credit = ""
+            c4 = ""
+          End If
+          cuse = "No"
+'ASSUME IF ONLY 1 part then IS A NON-CREDIT TYPE OF acknowledgement
+        End If
+        
+'MsgBox "found " & cid & "|" & ctype & "|" & c4 & "|" & courseDay & "|" & cname & "|" & credit
+      
+      Dim LastRow As Integer
+      isnew = False
+      found = False
+      
+      
+      
+      If (cid > -1) Then  ' should exist already: find row, compare fields, make copy if necessary and archive old and insert new, else leave alone
+'CHECK DATABASE FOR THIS ID
+
+'MsgBox ("Record has ID; Checking to see if exists in SP " & cid & "|" & cname)
+        found = CheckValuesInRow(creditConn, cid, newval, ctype, c4, courseDay, oSld.slideIndex, cname, credit, cuse, sldSrc, segmentSeries)
+'MsgBox "found fo r" & oSld.SlideIndex & " is " & found
+'IF FOUND, SET
+        If (found = True) Then
+          newslidenote = AddToNewSlideNote(newslidenote, cid, cname, credit, c4, ctype)
+'MsgBox "Found in SP [updated if needed]"
+        End If ' end same/change
+
+      ElseIf (cid < 0 And cname <> "") Then 'does not exist in SP yet -- get counter
+'MsgBox "No Id; adding new record to SP"
+        isnew = True
+        cid = GetMyNewId(idConn)
+        Call AddValuesToRow(creditConn, cid, newval, ctype, c4, courseDay, oSld.slideIndex, cname, credit, "C", cuse, sldSrc, segmentSeries)
+        newslidenote = AddToNewSlideNote(newslidenote, cid, cname, credit, c4, ctype)
+      End If ' end if/else found or added
+    
+      If (cid > -1 And found = False And isnew = False) Then 'add it in; was not found
+'MsgBox "Has id; should be in SP, but is NOT; adding CRUD = R item " & cid
+        Call AddValuesToRow(creditConn, cid, newval, ctype, c4, courseDay, oSld.slideIndex, cname, credit, "R", cuse, sldSrc, segmentSeries)
+        newslidenote = AddToNewSlideNote(newslidenote, cid, cname, credit, c4, ctype)
+      End If
+    
+    Next ' next line
+    oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text = newslidenote 'write back notes
+  End If ' was no text on slide
+  End If ' was not first slide
+
+  Next 'NEXT SLIDE
+'  idConn = Nothing
+'  creditConn = Nothing
+
+
+
+
+
+
+Dim selSql As String
+If (sldSrc = "Lesson") Then
+'IGNORES ACK SLIDE SINCE VALUE DOESN'T SHOW ON PAGE
+  selSql = "SELECT CR_SN, CRUD_MST, CR_RCD_TYPE from Credits where CR_RCD_TYPE= 'Current' and [Course Code] = " & newval & " and COURSE_DAY = '" & courseDay & "' and SL_SRC = '" & sldSrc & "' and CRUD_MST <> 'D' and MEDIA_TYPE <> 'AckSlide';"
+Else
+'IGNORES ACK SLIDE SINCE VALUE DOESN'T SHOW ON PAGE
+  selSql = "SELECT CR_SN, CRUD_MST, CR_RCD_TYPE from Credits where [Segment Series]='" & segmentSeries & "' and CR_RCD_TYPE= 'Current' and [Course Code] = " & newval & " and SL_SRC = '" & sldSrc & "' and CRUD_MST <> 'D' and MEDIA_TYPE <> 'AckSlide';"
+End If
+'MsgBox selSql
+
+Dim rst As ADODB.Recordset
+Set rst = New ADODB.Recordset
+
+Dim newmessage As String
+rst.Open selSql, creditConn, adOpenKeyset, adLockOptimistic
+
+
+
+
+
+Dim newsn As Integer
+
+If Not (rst.EOF And rst.BOF) Then
+  MsgBox "Checking to make sure credits in Sharepoint still exist in PPT..."
+  rst.MoveFirst
+  Do Until rst.EOF = True
+    newsn = rst.Fields(0).Value
+    'find slide with this SN
+    newmessage = CheckExists(newsn)
+    If (newmessage <> "") Then
+      If (fileEnv = "dev") Then
+        MsgBox newmessage
+      End If
+      rst.Fields("CR_RCD_TYPE") = "Archive"
+      rst.Fields("CRUD_MST") = "D"
+      rst.Update
+    End If
+    rst.MoveNext
+  Loop
+End If
+
+
+rst.Close
+Set rst = Nothing
+
+
+
+MsgBox ("Save credits to Sharepoint completed.")
+
+
+End Sub
+
+
+
+
+Function CheckExists(ByVal newsn As Integer) As String
+  Dim message As String
+  Dim searchfor As String
+  Dim inpresentation As Boolean
+  inpresentation = False
+
+  Dim newslidenote As String
+  For Each oSld In ActivePresentation.Slides
+    If oSld.slideIndex > 1 And oSld.CustomLayout.Name <> "Insert Segment" And oSld.CustomLayout.Name <> "Acknowledgments 1" And _
+       oSld.CustomLayout.Name <> "Acknowledgments 2" And oSld.CustomLayout.Name <> "Copyright" And _
+       Len(oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text) > 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "The first slide") <= 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "This is a placeholder slide") <= 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "Slide Transition") <= 0 And _
+       InStr(1, oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text, "This is the last slide") <= 0 Then
+    ' Write a label (could also include slide title with more code)
+    ' Get the slide note text
+      sSlideNote = oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text
+      strt = 0
+      If (Len(sSlideNote) > 0) Then
+        newslidenote = ""
+        sparts = Split(sSlideNote, Chr(13))
+        For Each lne In sparts
+          If (InStr(lne, (newsn & "^")) > 0) Then
+            inpresentation = True
+          End If
+        Next ' next line
+      End If ' was no text on slide
+    ElseIf oSld.CustomLayout.Name = "Insert Segment" Then
+    
+      sSlideNote = oSld.NotesPage.Shapes.Placeholders(2).TextFrame.TextRange.Text
+      strt = 0
+    
+      If (Len(sSlideNote) > 0) Then
+        newslidenote = ""
+        sparts = Split(sSlideNote, Chr(13))
+        For Each lne In sparts
+          If (InStr(lne, (newsn & "^")) > 0) Then
+            inpresentation = True
+          End If
+        Next ' next line
+      End If ' was no text on slide
+    
+    
+    End If ' was not a valid slide (inc insert segment slide)
+
+
+  Next 'NEXT SLIDE
+  If (inpresentation = False) Then
+    message = "Credit in SharePoint list with id " & newsn & " is not found and is being marked as deleted."
+    'ON RETURN - IF MESSAGE IS NOT NULL, MAKE CURRENT RECORDSET  = deleted
+  Else
+    message = ""
+  End If
+  CheckExists = message
+
+End Function
+
+
+
+
+
+Function CheckValuesInRow(cnt As ADODB.Connection, ByVal cid As String, ByVal courseLookupId As Integer, ByVal ctype As String, ByVal c4 As String, ByVal courseDay As String, ByVal slideIndx As Integer, ByVal cname As String, ByVal credit As String, ByVal cuse As String, ByVal sldSrc As String, ByVal segmentSeries As String) As Boolean
+Dim retVal As Boolean
+retVal = False
+
+' IF HAS ( )
+If (Len(credit) > 0) Then
+  If (InStr(credit, "http")) Then
+    If InStr(credit, "(") = 1 Then
+      credit = Right(credit, Len(credit) - 1)
+    End If
+    If InStr(credit, ")") = Len(credit) Then
+      credit = Left(credit, Len(credit) - 1)
+    End If
+  Else
+    c4 = c4 & " " & credit
+    credit = ""
+  End If
+End If
+
+If ctype = "" Or (ctype <> "Segment" And ctype <> "Engraving" And ctype <> "Woodcut" And ctype <> "Video Clip" And ctype <> "Sound Effect" And ctype <> "SFX" And ctype <> "Sound Clip" And ctype <> "Prop" And ctype <> "Map" And ctype <> "Image") Then
+  ctype = "Other"
+End If
+
+
+Dim selSql As String
+If (sldSrc = "Lesson") Then
+  selSql = "SELECT MEDIA_TYPE, MEDIA_NAME, COURSE_DAY, COURSE_SLIDE, CREDIT, URL, CR_RCD_TYPE, CR_USE, SL_SRC from Credits where CR_SN= " & cid & " and CR_RCD_TYPE= 'Current' and [Serial Type] = 'Credits' and CRUD_MST<>'D';"
+'MsgBox "checkin " & selSql
+Else
+  selSql = "SELECT MEDIA_TYPE, MEDIA_NAME, [Segment Series], COURSE_SLIDE, CREDIT, URL, CR_RCD_TYPE, CR_USE, SL_SRC from Credits where CR_SN= " & cid & " and CR_RCD_TYPE= 'Current' and [Serial Type] = 'Credits' and CRUD_MST<>'D';"
+End If
+
+'MsgBox selSql
+
+Dim rst As ADODB.Recordset
+Set rst = New ADODB.Recordset
+
+rst.Open selSql, cnt, adOpenKeyset, adLockOptimistic
+'rst.Open selSql, cnt, adOpenDynamic, adLockOptimistic
+
+Dim newctype As String
+Dim newc4 As String
+Dim newcourseDay As String
+Dim newSegmentSeries As String
+Dim newslideIndx As Integer
+Dim newcname As String
+Dim newcredit As String
+Dim newcuse As String
+Dim newSldSrc As String
+
+
+If Not rst.EOF Then
+  retVal = True
+
+
+  If rst.Fields(0).Value <> "" Then
+    newctype = rst.Fields(0).Value
+  Else
+    newctype = ""
+  End If
+  If rst.Fields(1).Value <> "" Then
+    newc4 = rst.Fields(1).Value
+  Else
+    newcr4 = ""
+  End If
+  If rst.Fields(2).Value <> "" Then
+    If (sldSrc = "Lesson") Then
+      newcourseDay = rst.Fields(2).Value
+    Else
+      newSegmentSeries = rst.Fields(2).Value
+    End If
+  Else
+    newcourseDay = ""
+  End If
+  If rst.Fields(3).Value <> "" Then
+    newslideIndx = rst.Fields(3).Value
+  Else
+    newslideIndx = 0
+  End If
+  If rst.Fields(4).Value <> "" Then
+    newcname = rst.Fields(4).Value
+  Else
+     newcname = ""
+  End If
+  If rst.Fields(5).Value <> "" Then
+    newcredit = rst.Fields(5).Value
+  Else
+    newcredit = ""
+  End If
+  If rst.Fields(6).Value <> "" Then
+    crrcdtype = rst.Fields(6).Value
+  Else
+    crrcdtype = ""
+  End If
+  If rst.Fields(7).Value <> "" Then
+    newcuse = rst.Fields(7).Value
+  Else
+    newcuse = ""
+  End If
+  If rst.Fields(8).Value <> "" Then
+    newSldSrc = rst.Fields(8).Value
+  Else
+    newSldSrc = ""
+  End If
+
+  If (sldSrc = "Lesson") Then
+    If newSldSrc <> sldSrc Or newctype <> ctype Or newcuse <> cuse Or newc4 <> c4 Or newcourseDay <> courseDay Or newslideIndx <> slideIndx Or newcname <> cname Or (newcredit <> credit And newcredit <> "#" & credit & "#" And InStr(newcredit, credit) <= 0) Then
+    ' UPDATE ROW ABOVE TO Archived and add new row
+      rst.Fields(6) = "Archive"
+      rst.Update
+      Call AddValuesToRow(cnt, cid, courseLookupId, ctype, c4, courseDay, slideIndx, cname, credit, "U", cuse, sldSrc, segmentSeries)
+    End If 'changed
+  Else 'SEGMENT
+    If newSldSrc <> sldSrc Or newctype <> ctype Or newcuse <> cuse Or newc4 <> c4 Or newSegmentSeries <> segmentSeries Or newslideIndx <> slideIndx Or newcname <> cname Or (newcredit <> credit And newcredit <> "#" & credit & "#" And InStr(newcredit, credit) <= 0) Then
+    
+    ' UPDATE ROW ABOVE TO Archived and add new row
+      rst.Fields(6) = "Archive"
+      rst.Update
+      Call AddValuesToRow(cnt, cid, courseLookupId, ctype, c4, courseDay, slideIndx, cname, credit, "U", cuse, sldSrc, segmentSeries)
+    End If 'changed
+  End If 'LESSON/SEGMENT
+
+  
+End If 'has records
+
+If CBool(rst.State And adStateOpen) = True Then
+  rst.Close
+End If
+Set rst = Nothing
+
+CheckValuesInRow = retVal
+
+End Function
+
+
+
+
+
+
+
+
+
+
+
