@@ -1,6 +1,6 @@
 videojs.registerPlugin('backForwardButtons', function() {
   var myPlayer = this,
-      jumpAmount = 5,
+      jumpAmount = 15,
       controlBar,
       insertBeforeNode,
       newElementBB = document.createElement('div'),
