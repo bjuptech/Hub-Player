@@ -1,4 +1,5 @@
 videojs.registerPlugin('resume', function() {
+var myPlayer = this,
 import videojs from 'video.js';
 import store from 'store';
 const Button = videojs.getComponent('Button');
@@ -159,5 +160,5 @@ const Resume = function(options) {
     }
   });
 };
-
+};
 videojs.plugin('Resume', Resume);
