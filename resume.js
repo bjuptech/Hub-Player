@@ -159,6 +159,5 @@ const Resume = function(options) {
     }
   });
 };
-};
 
 videojs.plugin('Resume', Resume);
