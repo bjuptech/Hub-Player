@@ -1,6 +1,6 @@
 videojs.registerPlugin('arrowKeys', function() {
   var myPlayer = this,
-      jumpAmount = 5;
+      jumpAmount = 15;
 
   // +++ Add event handlers to jump back or forward +++
   // Back button logic, don't jump to negative times
