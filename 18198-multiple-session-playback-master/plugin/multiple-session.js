@@ -3,7 +3,7 @@ videojs.registerPlugin('multipleSession', function() {
     var read_cookie = function(key) {
         var result;
         return (result = new RegExp('(^|; )' + encodeURIComponent(key) + '=([^;]*)').exec(document.cookie)) ? result[2] : null;
-    }
+    };
 
     // Initialize variables and read the browser cookie associated with the Brightcove video position
     var myPlayer = this,
@@ -25,7 +25,7 @@ videojs.registerPlugin('multipleSession', function() {
             myPlayer.currentTime(parseInt(cookie));
             myPlayer.play();
         }
-    })
+    });
     // Display the video start position
     document.getElementById("cookieDisplay1").innerHTML = videoStart;
 
@@ -45,6 +45,6 @@ videojs.registerPlugin('multipleSession', function() {
     myPlayer.on("ended", function() {
         videoStart = 0;
         document.cookie = "BC_position=;expires=0;";
-    })
+    });
 
 });
