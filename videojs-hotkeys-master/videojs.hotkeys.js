@@ -146,21 +146,7 @@ videojs.registerPlugin('hotkeys', function() {
         ) {
 
           switch (checkKeys(event, player)) {
-            // Spacebar toggles play/pause
-            case cPlay:
-              ePreventDefault();
-              if (alwaysCaptureHotkeys || captureDocumentHotkeys) {
-                // Prevent control activation with space
-                event.stopPropagation();
-              }
-
-              if (player.paused()) {
-                silencePromise(player.play());
-              } else {
-                player.pause();
-              }
-              break;
-
+            
             // Seeking with the left/right arrow keys
             case cRewind: // Seek Backward
               wasPlaying = !player.paused();
@@ -197,83 +183,7 @@ videojs.registerPlugin('hotkeys', function() {
               }
               break;
 
-            // Volume control with the up/down arrow keys
-            case cVolumeDown:
-              ePreventDefault();
-              if (!enableJogStyle) {
-                player.volume(player.volume() - volumeStep);
-              } else {
-                seekTime = player.currentTime() - 1;
-                if (player.currentTime() <= 1) {
-                  seekTime = 0;
-                }
-                player.currentTime(seekTime);
-              }
-              break;
-            case cVolumeUp:
-              ePreventDefault();
-              if (!enableJogStyle) {
-                player.volume(player.volume() + volumeStep);
-              } else {
-                seekTime = player.currentTime() + 1;
-                if (seekTime >= duration) {
-                  seekTime = duration;
-                }
-                player.currentTime(seekTime);
-              }
-              break;
-
-            // Toggle Mute with the M key
-            case cMute:
-              if (enableMute) {
-                player.muted(!player.muted());
-              }
-              break;
-
-            // Toggle Fullscreen with the F key
-            case  cFullscreen:
-              if (enableFull) {
-                if (player.isFullscreen()) {
-                  player.exitFullscreen();
-                } else {
-                  player.requestFullscreen();
-                }
-              }
-              break;
-
-            default:
-              // Number keys from 0-9 skip to a percentage of the video. 0 is 0% and 9 is 90%
-              if ((ewhich > 47 && ewhich < 59) || (ewhich > 95 && ewhich < 106)) {
-                // Do not handle if enableModifiersForNumbers set to false and keys are Ctrl, Cmd or Alt
-                if (enableModifiersForNumbers || !(event.metaKey || event.ctrlKey || event.altKey)) {
-                  if (enableNumbers) {
-                    var sub = 48;
-                    if (ewhich > 95) {
-                      sub = 96;
-                    }
-                    var number = ewhich - sub;
-                    ePreventDefault();
-                    player.currentTime(player.duration() * number * 0.1);
-                  }
-                }
-              }
-
-              // Handle any custom hotkeys
-              for (var customKey in options.customKeys) {
-                var customHotkey = options.customKeys[customKey];
-                // Check for well formed custom keys
-                if (customHotkey && customHotkey.key && customHotkey.handler) {
-                  // Check if the custom key's condition matches
-                  if (customHotkey.key(event)) {
-                    ePreventDefault();
-                    customHotkey.handler(player, options, event);
-                  }
-                }
-              }
-          }
-        }
-      }
-    };
+            
 
     var doubleClick = function doubleClick(event) {
       // Video.js added double-click fullscreen in 7.1.0
