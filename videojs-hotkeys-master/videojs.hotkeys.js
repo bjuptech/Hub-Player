@@ -6,7 +6,7 @@
  * Licensed under the Apache-2.0 license.
  */
 
-videojs.registerPlugin('backForwardButtons', function() {
+videojs.registerPlugin('hotkeys', function() {
 
 ;(function(root, factory) {
   if (typeof window !== 'undefined' && window.videojs) {
