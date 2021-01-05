@@ -43,14 +43,7 @@ videojs.registerPlugin('hotkeys', function() {
       enableModifiersForNumbers: true,
       enableInactiveFocus: true,
       skipInitialFocus: false,
-      playPauseKey: playPauseKey,
-      rewindKey: rewindKey,
-      forwardKey: forwardKey,
-      volumeUpKey: volumeUpKey,
-      volumeDownKey: volumeDownKey,
-      muteKey: muteKey,
-      fullscreenKey: fullscreenKey,
-      customKeys: {}
+            customKeys: {}
     };
 
     var cPlay = 1,
