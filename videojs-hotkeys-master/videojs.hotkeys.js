@@ -43,7 +43,14 @@ videojs.registerPlugin('hotkeys', function() {
       enableModifiersForNumbers: true,
       enableInactiveFocus: true,
       skipInitialFocus: false,
-            customKeys: {}
+      playPauseKey: playPauseKey,
+      rewindKey: rewindKey,
+      forwardKey: forwardKey,
+      volumeUpKey: volumeUpKey,
+      volumeDownKey: volumeDownKey,
+      muteKey: muteKey,
+      fullscreenKey: fullscreenKey,
+      customKeys: {}
     };
 
     var cPlay = 1,
@@ -139,7 +146,21 @@ videojs.registerPlugin('hotkeys', function() {
         ) {
 
           switch (checkKeys(event, player)) {
-            
+            // Spacebar toggles play/pause
+            case cPlay:
+              ePreventDefault();
+              if (alwaysCaptureHotkeys || captureDocumentHotkeys) {
+                // Prevent control activation with space
+                event.stopPropagation();
+              }
+
+              if (player.paused()) {
+                silencePromise(player.play());
+              } else {
+                player.pause();
+              }
+              break;
+
             // Seeking with the left/right arrow keys
             case cRewind: // Seek Backward
               wasPlaying = !player.paused();
@@ -176,5 +197,245 @@ videojs.registerPlugin('hotkeys', function() {
               }
               break;
 
+            // Volume control with the up/down arrow keys
+            case cVolumeDown:
+              ePreventDefault();
+              if (!enableJogStyle) {
+                player.volume(player.volume() - volumeStep);
+              } else {
+                seekTime = player.currentTime() - 1;
+                if (player.currentTime() <= 1) {
+                  seekTime = 0;
+                }
+                player.currentTime(seekTime);
+              }
+              break;
+            case cVolumeUp:
+              ePreventDefault();
+              if (!enableJogStyle) {
+                player.volume(player.volume() + volumeStep);
+              } else {
+                seekTime = player.currentTime() + 1;
+                if (seekTime >= duration) {
+                  seekTime = duration;
+                }
+                player.currentTime(seekTime);
+              }
+              break;
+
+            // Toggle Mute with the M key
+            case cMute:
+              if (enableMute) {
+                player.muted(!player.muted());
+              }
+              break;
+
+            // Toggle Fullscreen with the F key
+            case  cFullscreen:
+              if (enableFull) {
+                if (player.isFullscreen()) {
+                  player.exitFullscreen();
+                } else {
+                  player.requestFullscreen();
+                }
+              }
+              break;
+
+            default:
+              // Number keys from 0-9 skip to a percentage of the video. 0 is 0% and 9 is 90%
+              if ((ewhich > 47 && ewhich < 59) || (ewhich > 95 && ewhich < 106)) {
+                // Do not handle if enableModifiersForNumbers set to false and keys are Ctrl, Cmd or Alt
+                if (enableModifiersForNumbers || !(event.metaKey || event.ctrlKey || event.altKey)) {
+                  if (enableNumbers) {
+                    var sub = 48;
+                    if (ewhich > 95) {
+                      sub = 96;
+                    }
+                    var number = ewhich - sub;
+                    ePreventDefault();
+                    player.currentTime(player.duration() * number * 0.1);
+                  }
+                }
+              }
+
+              // Handle any custom hotkeys
+              for (var customKey in options.customKeys) {
+                var customHotkey = options.customKeys[customKey];
+                // Check for well formed custom keys
+                if (customHotkey && customHotkey.key && customHotkey.handler) {
+                  // Check if the custom key's condition matches
+                  if (customHotkey.key(event)) {
+                    ePreventDefault();
+                    customHotkey.handler(player, options, event);
+                  }
+                }
+              }
+          }
+        }
+      }
+    };
+
+    var doubleClick = function doubleClick(event) {
+      // Video.js added double-click fullscreen in 7.1.0
+      if (videojsVer != null && videojsVer <= "7.1.0") {
+        // When controls are disabled, hotkeys will be disabled as well
+        if (player.controls()) {
+
+          // Don't catch clicks if any control buttons are focused
+          var activeEl = event.relatedTarget || event.toElement || doc.activeElement;
+          if (activeEl == pEl ||
+              activeEl == pEl.querySelector('.vjs-tech') ||
+              activeEl == pEl.querySelector('.iframeblocker')) {
+
+            if (enableFull) {
+              if (player.isFullscreen()) {
+                player.exitFullscreen();
+              } else {
+                player.requestFullscreen();
+              }
+            }
+          }
+        }
+      }
+    };
+
+    var volumeHover = false;
+    var volumeSelector = pEl.querySelector('.vjs-volume-menu-button') || pEl.querySelector('.vjs-volume-panel');
+    if (volumeSelector != null) {
+      volumeSelector.onmouseover = function() { volumeHover = true; };
+      volumeSelector.onmouseout = function() { volumeHover = false; };
+    }
+
+    var mouseScroll = function mouseScroll(event) {
+      if (enableHoverScroll) {
+        // If we leave this undefined then it can match non-existent elements below
+        var activeEl = 0;
+      } else {
+        var activeEl = doc.activeElement;
+      }
+
+      // When controls are disabled, hotkeys will be disabled as well
+      if (player.controls()) {
+        if (alwaysCaptureHotkeys ||
+            activeEl == pEl ||
+            activeEl == pEl.querySelector('.vjs-tech') ||
+            activeEl == pEl.querySelector('.iframeblocker') ||
+            activeEl == pEl.querySelector('.vjs-control-bar') ||
+            volumeHover) {
+
+          if (enableVolumeScroll) {
+            event = window.event || event;
+            var delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
+            event.preventDefault();
+
+            if (delta == 1) {
+              player.volume(player.volume() + volumeStep);
+            } else if (delta == -1) {
+              player.volume(player.volume() - volumeStep);
+            }
+          }
+        }
+      }
+    };
+
+    var checkKeys = function checkKeys(e, player) {
+      // Allow some modularity in defining custom hotkeys
+
+      // Play/Pause check
+      if (options.playPauseKey(e, player)) {
+        return cPlay;
+      }
+
+      // Seek Backward check
+      if (options.rewindKey(e, player)) {
+        return cRewind;
+      }
+
+      // Seek Forward check
+      if (options.forwardKey(e, player)) {
+        return cForward;
+      }
+
+      // Volume Up check
+      if (options.volumeUpKey(e, player)) {
+        return cVolumeUp;
+      }
+
+      // Volume Down check
+      if (options.volumeDownKey(e, player)) {
+        return cVolumeDown;
+      }
+
+      // Mute check
+      if (options.muteKey(e, player)) {
+        return cMute;
+      }
+
+      // Fullscreen check
+      if (options.fullscreenKey(e, player)) {
+        return cFullscreen;
+      }
+    };
+
+    function playPauseKey(e) {
+      // Space bar or MediaPlayPause
+      return (e.which === 32 || e.which === 179);
+    }
+
+    function rewindKey(e) {
+      // Left Arrow or MediaRewind
+      return (e.which === 37 || e.which === 177);
+    }
+
+    function forwardKey(e) {
+      // Right Arrow or MediaForward
+      return (e.which === 39 || e.which === 176);
+    }
+
+    function volumeUpKey(e) {
+      // Up Arrow
+      return (e.which === 38);
+    }
+
+    function volumeDownKey(e) {
+      // Down Arrow
+      return (e.which === 40);
+    }
+
+    function muteKey(e) {
+      // M key
+      return (e.which === 77);
+    }
+
+    function fullscreenKey(e) {
+      // F key
+      return (e.which === 70);
+    }
+
+    function seekStepD(e) {
+      // SeekStep caller, returns an int, or a function returning an int
+      return (typeof seekStep === "function" ? seekStep(e) : seekStep);
+    }
+
+    function silencePromise(value) {
+      if (value != null && typeof value.then === 'function') {
+        value.then(null, function(e) {});
+      }
+    }
+
+    player.on('keydown', keyDown);
+    player.on('dblclick', doubleClick);
+    player.on('mousewheel', mouseScroll);
+    player.on("DOMMouseScroll", mouseScroll);
+
+    if (captureDocumentHotkeys) {
+      document.addEventListener('keydown', function (event) { keyDown(event) });
+    }
+
+    return this;
+  };
+
+  var registerPlugin = videojs.registerPlugin || videojs.plugin;
+  registerPlugin('hotkeys', hotkeys);
 }));
 });
