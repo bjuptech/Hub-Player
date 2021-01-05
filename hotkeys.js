@@ -438,4 +438,4 @@ videojs.registerPlugin('hotkeys', function() {
   var registerPlugin = videojs.registerPlugin || videojs.plugin;
   registerPlugin('hotkeys', hotkeys);
 }));
-};
+});
