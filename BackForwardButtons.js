@@ -15,7 +15,7 @@ videojs.registerPlugin('backForwardButtons', function() {
     // +++ Assign properties to elements and assign to parents +++
     newImageBB.setAttribute('src', '//player.support.brightcove.com/assets/images/code-samples/brightcove-player-sample-back-forward-buttons/back-button.png');
     newElementBB.appendChild(newImageBB);
-    newImageFB.setAttribute('src', 'https://player.support.brightcove.com/assets/images/code-samples/brightcove-player-sample-back-forward-buttons/forward-button.png');
+    newImageFB.setAttribute('src', '//player.support.brightcove.com/assets/images/code-samples/brightcove-player-sample-back-forward-buttons/forward-button.png');
     newElementFB.appendChild(newImageFB);
 
     // +++ Get controlbar and insert elements +++
